@@ -1,0 +1,77 @@
+<?php
+
+
+use Cron\CronBundle\Command\CronEnableCommand;
+use Symfony\Component\Console\Tester\CommandTester;
+use Symfony\Bundle\FrameworkBundle\Console\Application;
+use Symfony\Bundle\FrameworkBundle\Test\WebTestCase;
+
+class CronEnableCommandTest extends WebTestCase
+{
+    public function testUnknownJob()
+    {
+        $manager = $this->getMockBuilder('Cron\CronBundle\Cron\Manager')
+            ->disableOriginalConstructor()
+            ->getMock();
+        $manager
+            ->expects($this->once())
+            ->method('getJobByName');
+
+        $command = $this->getCommand($manager);
+
+        $this->setExpectedException('InvalidArgumentException');
+
+        $commandTester = new CommandTester($command);
+        $commandTester->execute(array(
+            'job'     => 'jobName',
+        ));
+    }
+
+    public function testEnable()
+    {
+        $manager = $this->getMockBuilder('Cron\CronBundle\Cron\Manager')
+            ->disableOriginalConstructor()
+            ->getMock();
+
+        $job = new \Cron\CronBundle\Entity\CronJob();
+        $manager
+            ->expects($this->once())
+            ->method('getJobByName')
+            ->will($this->returnValue($job));
+
+        $command = $this->getCommand($manager);
+
+        $commandTester = new CommandTester($command);
+        $commandTester->execute(array(
+            'job'     => 'jobName',
+        ));
+
+        $this->assertEquals(0, $commandTester->getStatusCode());
+        $this->assertEquals(true, $job->getEnabled());
+    }
+
+    public function testNoJobArgument()
+    {
+        $manager = $this->getMockBuilder('Cron\CronBundle\Cron\Manager')
+            ->disableOriginalConstructor()
+            ->getMock();
+        $command = $this->getCommand($manager);
+
+        $this->setExpectedException('RuntimeException');
+
+        $commandTester = new CommandTester($command);
+        $commandTester->execute(array());
+    }
+
+    protected function getCommand($manager)
+    {
+        $kernel = $this->createKernel();
+        $kernel->boot();
+        $kernel->getContainer()->set('cron.manager', $manager);
+
+        $application = new Application($kernel);
+        $application->add(new CronEnableCommand());
+
+        return $application->find('cron:enable');
+    }
+}
